@@ -1,0 +1,42 @@
+/**:
+    ros__parameters:
+        common:
+            lid_topic:  "/lidar_points"
+            imu_topic:  "/lidar_imu"
+            time_sync_en: false
+            time_offset_lidar_to_imu: 0.0
+
+        preprocess:
+            lidar_type: 5                # 5 = HESAI (hesai_handler; jt128 point format x,y,z,intensity,timestamp(double),ring)
+            scan_line:  128
+            blind: 0.5                   # seq01 indoor; raise for seq02 outdoor
+            timestamp_unit: 0            # hesai_handler converts absolute-sec timestamp to relative ms internally
+            scan_rate: 10
+
+        mapping:
+            acc_cov: 0.1
+            gyr_cov: 0.1
+            b_acc_cov: 0.0001
+            b_gyr_cov: 0.0001
+            fov_degree:    360.0
+            det_range:     100.0
+            extrinsic_est_en:  false      # IMU shares lidar frame (hesai_lidar) -> identity extrinsic
+            extrinsic_T: [ 0.0, 0.0, 0.0 ]
+            extrinsic_R: [1., 0., 0.,
+                          0., 1., 0.,
+                          0., 0., 1.]
+
+        publish:
+            path_en: true
+            scan_publish_en:  true
+            dense_publish_en: false
+            scan_bodyframe_pub_en: true
+
+        map_file_path: "/tmp/jt128_result.pcd"
+        pcd_save:
+            pcd_save_en: false
+            interval: -1
+
+        traj_save:
+            traj_save_en: false
+            traj_file_path: "/tmp/jt128_traj.txt"

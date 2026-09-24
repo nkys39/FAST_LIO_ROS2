@@ -14,7 +14,7 @@ def generate_launch_description():
     package_path = get_package_share_directory('fast_lio')
 
     # Create LaunchConfigurations for the parameters with default values (not in config file)
-    feature_extract_enable_param = LaunchConfiguration('feature_extract_enable', default='false') # bool
+    feature_extract_enable_param = LaunchConfiguration('feature_extract_enable', default='true') # bool
     point_filter_num_param = LaunchConfiguration('point_filter_num', default='3')                 # int
     max_iteration_param = LaunchConfiguration('max_iteration', default='3')                       # int
     filter_size_surf_param = LaunchConfiguration('filter_size_surf', default='0.5')               # double
@@ -22,7 +22,7 @@ def generate_launch_description():
     cube_side_length_param = LaunchConfiguration('cube_side_length', default='1000.0')            # double
     runtime_pos_log_enable_param = LaunchConfiguration('runtime_pos_log_enable', default='false')  # bool
 
-    default_config_path = os.path.join(package_path, 'config', 'mid360.yaml')
+    default_config_path = os.path.join(package_path, 'config', 'mid360_sim.yaml')
     default_rviz_config_path = os.path.join(
         package_path, 'rviz_cfg', 'fastlio.rviz')
 
@@ -85,15 +85,15 @@ def generate_launch_description():
     #     arguments=["0", "0", "0", "0", "0", "0", "body", "livox_frame_192_168_0_10"],
     # )
 
-    map_camerainit = Node(
-        package = 'tf2_ros',
-        executable = 'static_transform_publisher',
-        name = 'camerainit_world_footprint_tf2',
-        # arguments=["0", "0", "0.0", "0.0", "-0.17", "0.0", "camera_init", "map"], #128
-        arguments=["0.0", "0", "0.0", "0.0", "0.0", "0.0", "camera_init", "map"], #119
-        # arguments=["0.0", "0.0", "0.0", "0.0", "-0.785398163397448", "0.0", "camera_init", "map"], # ozaki
-        # arguments=["-1.24", "0.0", "0.0", "0.0", "-1.6929693744345", "3.14159265358979", "camera_init", "map"],  #fujisawa
-    )
+    # map_camerainit = Node(
+    #     package = 'tf2_ros',
+    #     executable = 'static_transform_publisher',
+    #     name = 'camerainit_world_footprint_tf2',
+    #     # arguments=["0", "0", "0.0", "0.0", "-0.17", "0.0", "camera_init", "map"], #128
+    #     arguments=["0.0", "0", "0.0", "0.0", "-1.6929693744345", "0.0", "camera_init", "map"], #119
+    #     # arguments=["0.0", "0.0", "0.0", "0.0", "-0.785398163397448", "0.0", "camera_init", "map"], # ozaki
+    #     # arguments=["-1.24", "0.0", "0.0", "0.0", "-1.6929693744345", "3.14159265358979", "camera_init", "map"],  #fujisawa
+    # )
 
 
     ld = LaunchDescription()
@@ -106,6 +106,6 @@ def generate_launch_description():
 
     # ld.add_action(map_camerainit)
 
-    ld.add_action(rviz_node)
+    # ld.add_action(rviz_node)
 
     return ld

@@ -21,8 +21,7 @@ CONTAINER_NAME="$1"
 IMAGE_NAME="$2"
 
 # Launch the nvidia-docker container with the provided image name and tag
-docker run --privileged -it \
-            --gpus all \
+nvidia-docker run --privileged -it \
            -e NVIDIA_DRIVER_CAPABILITIES=all \
            -e NVIDIA_VISIBLE_DEVICES=all \
            --volume="$PROJECT_DIR:/root/ros2_ws/src" \

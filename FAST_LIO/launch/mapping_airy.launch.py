@@ -22,7 +22,7 @@ def generate_launch_description():
     cube_side_length_param = LaunchConfiguration('cube_side_length', default='1000.0')            # double
     runtime_pos_log_enable_param = LaunchConfiguration('runtime_pos_log_enable', default='false')  # bool
 
-    default_config_path = os.path.join(package_path, 'config', 'mid360.yaml')
+    default_config_path = os.path.join(package_path, 'config', 'airy.yaml')
     default_rviz_config_path = os.path.join(
         package_path, 'rviz_cfg', 'fastlio.rviz')
 
@@ -85,17 +85,6 @@ def generate_launch_description():
     #     arguments=["0", "0", "0", "0", "0", "0", "body", "livox_frame_192_168_0_10"],
     # )
 
-    map_camerainit = Node(
-        package = 'tf2_ros',
-        executable = 'static_transform_publisher',
-        name = 'camerainit_world_footprint_tf2',
-        # arguments=["0", "0", "0.0", "0.0", "-0.17", "0.0", "camera_init", "map"], #128
-        arguments=["0.0", "0", "0.0", "0.0", "0.0", "0.0", "camera_init", "map"], #119
-        # arguments=["0.0", "0.0", "0.0", "0.0", "-0.785398163397448", "0.0", "camera_init", "map"], # ozaki
-        # arguments=["-1.24", "0.0", "0.0", "0.0", "-1.6929693744345", "3.14159265358979", "camera_init", "map"],  #fujisawa
-    )
-
-
     ld = LaunchDescription()
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_config_path_cmd)
@@ -104,8 +93,8 @@ def generate_launch_description():
 
     ld.add_action(fast_lio_node)
 
-    # ld.add_action(map_camerainit)
+    # ld.add_action(body_livox_frame_192_168_0_10_tf2)
 
-    ld.add_action(rviz_node)
+    # ld.add_action(rviz_node)
 
     return ld

@@ -1,0 +1,44 @@
+/**:
+    ros__parameters:
+        common:
+            lid_topic:  "/ouster/points"
+            imu_topic:  "/ouster/imu"
+            time_sync_en: false
+            time_offset_lidar_to_imu: 0.0
+
+        preprocess:
+            lidar_type: 3                # 3 for ouster LiDAR (OS0-128 uses same handler as OS-1 64)
+            scan_line:  128              # OS0-128
+            blind: 1.0                   # OS0 is wide-angle short-range, shorter blind than OS-1
+            timestamp_unit: 3            # NS (Ouster t field: UINT32 nanoseconds)
+            scan_rate: 10
+
+        mapping:
+            acc_cov: 0.1
+            gyr_cov: 0.1
+            b_acc_cov: 0.0001
+            b_gyr_cov: 0.0001
+            fov_degree:    360.0
+            det_range:     50.0          # OS0 max range ~50m (OS-1 is ~120m)
+            extrinsic_est_en:  false
+            # Rz(pi) from lidar_to_sensor_transform (os_enwide.json)
+            # T from (t_l2s - t_i2s) with iG-LIO/SLAM-application verified value
+            extrinsic_T: [ -0.006253, 0.011775, 0.03055 ]
+            extrinsic_R: [-1.0, 0.0, 0.0,
+                           0.0, -1.0, 0.0,
+                           0.0,  0.0, 1.0]
+
+        publish:
+            path_en: true
+            scan_publish_en:  true
+            dense_publish_en: false
+            scan_bodyframe_pub_en: true
+
+        map_file_path: ""
+        pcd_save:
+            pcd_save_en: false
+            interval: -1
+
+        traj_save:
+            traj_save_en: true
+            traj_file_path: "/home/user/dataset/ENWIDE_LiDAR_Inertial_Dataset/results/tunnel_s/fast_lio/trajectory.txt"

@@ -15,14 +15,14 @@ def generate_launch_description():
 
     # Create LaunchConfigurations for the parameters with default values (not in config file)
     feature_extract_enable_param = LaunchConfiguration('feature_extract_enable', default='false') # bool
-    point_filter_num_param = LaunchConfiguration('point_filter_num', default='3')                 # int
+    point_filter_num_param = LaunchConfiguration('point_filter_num', default='2')                 # int  (128ch: use every 2nd point)
     max_iteration_param = LaunchConfiguration('max_iteration', default='3')                       # int
-    filter_size_surf_param = LaunchConfiguration('filter_size_surf', default='0.5')               # double
-    filter_size_map_param = LaunchConfiguration('filter_size_map', default='0.5')                 # double
+    filter_size_surf_param = LaunchConfiguration('filter_size_surf', default='0.25')              # double
+    filter_size_map_param = LaunchConfiguration('filter_size_map', default='0.25')                # double
     cube_side_length_param = LaunchConfiguration('cube_side_length', default='1000.0')            # double
     runtime_pos_log_enable_param = LaunchConfiguration('runtime_pos_log_enable', default='false')  # bool
 
-    default_config_path = os.path.join(package_path, 'config', 'mid360.yaml')
+    default_config_path = os.path.join(package_path, 'config', 'enwide.yaml')
     default_rviz_config_path = os.path.join(
         package_path, 'rviz_cfg', 'fastlio.rviz')
 
@@ -33,7 +33,7 @@ def generate_launch_description():
     rviz_cfg = LaunchConfiguration('rviz_cfg')
 
     declare_use_sim_time_cmd = DeclareLaunchArgument(
-        'use_sim_time', default_value='false',
+        'use_sim_time', default_value='true',
         description='Use simulation (Gazebo) clock if true'
     )
     declare_config_path_cmd = DeclareLaunchArgument(
@@ -61,7 +61,7 @@ def generate_launch_description():
                     'filter_size_map': filter_size_map_param,
                     'cube_side_length': cube_side_length_param,
                     'runtime_pos_log_enable': runtime_pos_log_enable_param}],
-        output='log'
+        output='screen'
     )
     rviz_node = Node(
         package='rviz2',
@@ -70,32 +70,6 @@ def generate_launch_description():
         condition=IfCondition(rviz_use)
     )
 
-    # body_base_footprint = Node(
-    #     package = 'tf2_ros',
-    #     executable = 'static_transform_publisher',
-    #     name = 'body_base_footprint_tf2',
-    #     # arguments=["0", "0", "0.0", "0.0", "0.0", "0.0", "body", "base_link"],
-    #     arguments=["0", "0", "-1.24", "-6.0", "-83.0", "176.0", "body", "base_footprint"],
-    # )
-
-    # body_livox_frame_192_168_0_10_tf2 = Node(
-    #     package = 'tf2_ros',
-    #     executable = 'static_transform_publisher',
-    #     name = 'body_livox_frame_192_168_0_10_tf2',
-    #     arguments=["0", "0", "0", "0", "0", "0", "body", "livox_frame_192_168_0_10"],
-    # )
-
-    map_camerainit = Node(
-        package = 'tf2_ros',
-        executable = 'static_transform_publisher',
-        name = 'camerainit_world_footprint_tf2',
-        # arguments=["0", "0", "0.0", "0.0", "-0.17", "0.0", "camera_init", "map"], #128
-        arguments=["0.0", "0", "0.0", "0.0", "0.0", "0.0", "camera_init", "map"], #119
-        # arguments=["0.0", "0.0", "0.0", "0.0", "-0.785398163397448", "0.0", "camera_init", "map"], # ozaki
-        # arguments=["-1.24", "0.0", "0.0", "0.0", "-1.6929693744345", "3.14159265358979", "camera_init", "map"],  #fujisawa
-    )
-
-
     ld = LaunchDescription()
     ld.add_action(declare_use_sim_time_cmd)
     ld.add_action(declare_config_path_cmd)
@@ -103,9 +77,6 @@ def generate_launch_description():
     ld.add_action(declare_rviz_config_path_cmd)
 
     ld.add_action(fast_lio_node)
-
-    # ld.add_action(map_camerainit)
-
     ld.add_action(rviz_node)
 
     return ld

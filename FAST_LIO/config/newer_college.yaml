@@ -1,0 +1,46 @@
+/**:
+    ros__parameters:
+        common:
+            # Newer College Dataset 01_short (Ouster OS1-64, internal IMU)
+            lid_topic:  "/os1_cloud_node/points"
+            imu_topic:  "/os1_cloud_node/imu"
+            time_sync_en: false
+            time_offset_lidar_to_imu: 0.0
+
+        preprocess:
+            lidar_type: 3                # 3 = Ouster
+            scan_line:  64               # OS1-64
+            blind: 2.0
+            timestamp_unit: 3            # Ouster per-point 't' is in nanoseconds
+            scan_rate: 10
+
+        mapping:
+            acc_cov: 0.1
+            gyr_cov: 0.1
+            b_acc_cov: 0.0001
+            b_gyr_cov: 0.0001
+            fov_degree:    360.0
+            det_range:     100.0
+            extrinsic_est_en:  false
+            # OS1-64 lidar->imu (internal). Identity is adequate for this validation;
+            # refine later for accurate evo evaluation.
+            extrinsic_T: [ 0.0, 0.0, 0.0 ]
+            # MUST be doubles (ROS2 Jazzy rejects integer_array for a double_array param)
+            extrinsic_R: [1.0, 0.0, 0.0,
+                          0.0, 1.0, 0.0,
+                          0.0, 0.0, 1.0]
+
+        publish:
+            path_en: true
+            scan_publish_en:  true
+            dense_publish_en: true
+            scan_bodyframe_pub_en: true
+
+        map_file_path: "/tmp/fastlio_nc_result.pcd"
+        pcd_save:
+            pcd_save_en: false
+            interval: -1
+
+        traj_save:
+            traj_save_en: false
+            traj_file_path: "/tmp/fastlio_nc_traj.txt"
