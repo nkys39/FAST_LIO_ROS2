@@ -63,6 +63,9 @@
 #include "preprocess.h"
 #include <ikd-Tree/ikd_Tree.h>
 
+#include <tf2_ros/transform_listener.h>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.hpp>
+
 #define INIT_TIME           (0.1)
 #define LASER_POINT_COV     (0.001)
 #define MAXN                (720000)
@@ -94,6 +97,7 @@ double last_timestamp_lidar = 0, last_timestamp_imu = -1.0;
 double gyr_cov = 0.1, acc_cov = 0.1, b_gyr_cov = 0.0001, b_acc_cov = 0.0001;
 double filter_size_surf_min = 0, filter_size_map_min = 0, fov_deg = 0;
 double cube_len = 0, HALF_FOV_COS = 0, FOV_DEG = 0, total_distance = 0, lidar_end_time = 0, first_lidar_time = 0.0;
+int num_sub_cloud;
 int    effct_feat_num = 0, time_log_counter = 0, scan_count = 0, publish_count = 0;
 int    iterCount = 0, feats_down_size = 0, NUM_MAX_ITERATIONS = 0, laserCloudValidNum = 0, pcd_save_interval = -1, pcd_index = 0;
 bool   point_selected_surf[100000] = {0};
@@ -298,14 +302,29 @@ void standard_pcl_cbk(const sensor_msgs::msg::PointCloud2::UniquePtr msg)
         is_first_lidar = false;
     }
 
-    PointCloudXYZI::Ptr  ptr(new PointCloudXYZI());
-    p_pre->process(msg, ptr);
-    lidar_buffer.push_back(ptr);
-    time_buffer.push_back(cur_time);
-    last_timestamp_lidar = cur_time;
+    if(p_pre->lidar_type == AIRY){
+        double start_time, end_time;
+        for(int i_sub_cloud = 0; i_sub_cloud < num_sub_cloud; i_sub_cloud ++){
+            PointCloudXYZI::Ptr  ptr(new PointCloudXYZI());
+            p_pre->process(msg, ptr, i_sub_cloud, num_sub_cloud, start_time, end_time);
+            lidar_buffer.push_back(ptr);
+            time_buffer.push_back(start_time);
+            last_timestamp_lidar = start_time;
+            sig_buffer.notify_all();
+        }
+        lidar_end_time = end_time;
+    }else{
+        double start_time, end_time;
+        PointCloudXYZI::Ptr  ptr(new PointCloudXYZI());
+        p_pre->process(msg, ptr, 0, 0, start_time, end_time);
+        lidar_buffer.push_back(ptr);
+        time_buffer.push_back(cur_time);
+        last_timestamp_lidar = cur_time;
+        sig_buffer.notify_all();
+    }
     s_plot11[scan_count] = omp_get_wtime() - preprocess_start_time;
     mtx_buffer.unlock();
-    sig_buffer.notify_all();
+    // sig_buffer.notify_all();
 }
 
 double timediff_lidar_wrt_imu = 0.0;
@@ -542,7 +561,28 @@ void publish_frame_world(rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::Share
     //         scan_wait_num = 0;
     //     }
     // }
-    
+
+}
+
+// 全点(deskew 済み feats_undistort、voxel ダウンサンプル無し)を /cloud_registered と同一の
+// world(camera_init)フレーム・lidar_end_time で出力する。GNG-DT 用の高密度入力。
+// 注: preprocess の point_filter_num による間引きは残る(更に密にするなら point_filter_num=1)。
+void publish_frame_world_full(rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudFullDense)
+{
+    if (feats_undistort == nullptr || feats_undistort->empty()) return;
+    // 購読者ゼロなら全点変換(~7万点/scan)を丸ごとスキップ(GNG を使わない構成での CPU 浪費防止)
+    if (pubLaserCloudFullDense->get_subscription_count() < 1) return;
+    int size = feats_undistort->points.size();
+    PointCloudXYZI::Ptr laserCloudWorld(new PointCloudXYZI(size, 1));
+    for (int i = 0; i < size; i++)
+    {
+        RGBpointBodyToWorld(&feats_undistort->points[i], &laserCloudWorld->points[i]);
+    }
+    sensor_msgs::msg::PointCloud2 laserCloudmsg;
+    pcl::toROSMsg(*laserCloudWorld, laserCloudmsg);
+    laserCloudmsg.header.stamp = get_ros_time(lidar_end_time);   // /cloud_registered と同一時刻
+    laserCloudmsg.header.frame_id = "camera_init";               // /cloud_registered と同一フレーム
+    pubLaserCloudFullDense->publish(laserCloudmsg);
 }
 
 void publish_frame_body(rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudFull_body)
@@ -559,6 +599,7 @@ void publish_frame_body(rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::Shared
     sensor_msgs::msg::PointCloud2 laserCloudmsg;
     pcl::toROSMsg(*laserCloudIMUBody, laserCloudmsg);
     laserCloudmsg.header.stamp = get_ros_time(lidar_end_time);
+    //laserCloudmsg.header.frame_id = "base_link";
     laserCloudmsg.header.frame_id = "body";
     pubLaserCloudFull_body->publish(laserCloudmsg);
     publish_count -= PUBFRAME_PERIOD;
@@ -592,7 +633,11 @@ void publish_map(rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pub
         RGBpointBodyToWorld(&laserCloudFullRes->points[i], \
                             &laserCloudWorld->points[i]);
     }
-    *pcl_wait_pub += *laserCloudWorld;
+    *pcl_wait_pub += *laserCloudWorld;   // 蓄積は維持(map_save サービスが pcl_wait_pub を書き出すため)
+
+    // /Laser_map は局所地図全体(セッション後半で 30MB 超)なので、購読者ゼロなら publish しない
+    // (無購読で毎周期 30MB を toROSMsg+publish すると SHM mempool 超過警告と CPU 浪費になる)
+    if (pubLaserCloudMap->get_subscription_count() < 1) return;
 
     sensor_msgs::msg::PointCloud2 laserCloudmsg;
     pcl::toROSMsg(*pcl_wait_pub, laserCloudmsg);
@@ -874,6 +919,10 @@ public:
         this->get_parameter_or<double>("mapping.acc_cov",acc_cov,0.1);
         this->get_parameter_or<double>("mapping.b_gyr_cov",b_gyr_cov,0.0001);
         this->get_parameter_or<double>("mapping.b_acc_cov",b_acc_cov,0.0001);
+        this->get_parameter_or<int>("mapping.num_sub_cloud",num_sub_cloud,1);
+        bool gravity_align_param;
+        this->get_parameter_or<bool>("mapping.gravity_align", gravity_align_param, true);
+        p_imu->gravity_align_ = gravity_align_param;
         this->get_parameter_or<double>("preprocess.blind", p_pre->blind, 0.01);
         this->get_parameter_or<int>("preprocess.lidar_type", p_pre->lidar_type, AVIA);
         this->get_parameter_or<int>("preprocess.scan_line", p_pre->N_SCANS, 16);
@@ -943,6 +992,8 @@ public:
         }
         sub_imu_ = this->create_subscription<sensor_msgs::msg::Imu>(imu_topic, 10, imu_cbk);
         pubLaserCloudFull_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered", 20);
+        // depth 5: ~2.2MB/msg なので depth20 だと最大44MB バッファ+SHM mempool を圧迫する。latest 重視の GNG 用途には 5 で十分
+        pubLaserCloudFullDense_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered_full", 5);
         pubLaserCloudFull_body_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_registered_body", 20);
         pubLaserCloudEffect_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/cloud_effected", 20);
         pubLaserCloudMap_ = this->create_publisher<sensor_msgs::msg::PointCloud2>("/Laser_map", 20);
@@ -973,6 +1024,7 @@ private:
     //*** main functions ***//
     void timer_callback()
     {
+        static int imu_flag = 0;
         if(sync_packages(Measures))
         {
             if (flg_first_scan)
@@ -993,8 +1045,10 @@ private:
             t0 = omp_get_wtime();
 
             p_imu->Process(Measures, kf, feats_undistort);
+            imu_flag = 1;
             state_point = kf.get_x();
             pos_lid = state_point.pos + state_point.rot * state_point.offset_T_L_I;
+            RCLCPP_INFO(this->get_logger(), "%.3f, %.3f, %.3f\n",pos_lid[0],pos_lid[1],pos_lid[2]);
 
             if (feats_undistort->empty() || (feats_undistort == NULL))
             {
@@ -1086,6 +1140,7 @@ private:
             /******* Publish points *******/
             if (path_en)                         publish_path(pubPath_);
             if (scan_pub_en)      publish_frame_world(pubLaserCloudFull_);
+            if (scan_pub_en)      publish_frame_world_full(pubLaserCloudFullDense_);  // 全点 /cloud_registered_full
             if (scan_pub_en && scan_body_pub_en) publish_frame_body(pubLaserCloudFull_body_);
 
             /*** Debug variables ***/
@@ -1117,6 +1172,15 @@ private:
                 <<" "<<state_point.bg.transpose()<<" "<<state_point.ba.transpose()<<" "<<state_point.grav<<" "<<feats_undistort->points.size()<<endl;
                 dump_lio_state_to_log(fp);
             }
+        }else if(imu_flag == 1){
+            esekfom::esekf<state_ikfom, 12, input_ikfom> tmp_kf;
+            tmp_kf = kf; 
+            // tmp_kf.x_ = kf.get_x();
+            // tmp_kf.P_ = kf.get_P();
+            p_imu->tmpProcess(Measures, tmp_kf);
+            state_ikfom tmp_point = tmp_kf.get_x();
+            vect3 tmp_pos_lid = tmp_point.pos + tmp_point.rot * tmp_point.offset_T_L_I;
+            RCLCPP_INFO(this->get_logger(), "%.3f, %.3f, %.3f\n",tmp_pos_lid[0],tmp_pos_lid[1],tmp_pos_lid[2]);
         }
     }
 
@@ -1143,6 +1207,7 @@ private:
 
 private:
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudFull_;
+    rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudFullDense_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudFull_body_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudEffect_;
     rclcpp::Publisher<sensor_msgs::msg::PointCloud2>::SharedPtr pubLaserCloudMap_;

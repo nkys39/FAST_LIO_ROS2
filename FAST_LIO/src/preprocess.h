@@ -16,7 +16,9 @@ enum LID_TYPE
   AVIA = 1,
   VELO16,
   OUST64,
-  MID360
+  MID360,
+  HESAI,
+  AIRY
 };  //{1, 2, 3}
 enum TIME_UNIT
 {
@@ -83,6 +85,22 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(velodyne_ros::Point,
                                                                           intensity)(float, time, time)(uint16_t, ring,
                                                                                                         ring))
 
+namespace hesai_ros
+{
+struct EIGEN_ALIGN16 Point
+{
+  PCL_ADD_POINT4D;
+  float intensity;
+  double timestamp;
+  uint16_t ring;
+  EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+};
+}  // namespace hesai_ros
+POINT_CLOUD_REGISTER_POINT_STRUCT(hesai_ros::Point,
+                                  (float, x, x)(float, y, y)(float, z, z)(float, intensity,
+                                                                          intensity)(double, timestamp, timestamp)(uint16_t, ring,
+                                                                                                                   ring))
+
 namespace ouster_ros
 {
 struct EIGEN_ALIGN16 Point
@@ -132,6 +150,28 @@ POINT_CLOUD_REGISTER_POINT_STRUCT(livox_ros::LivoxPointXyzrtl,
     (uint8_t, line, line)
 )
 
+//rjy
+namespace robosenseM1_ros {
+    struct Point {
+        PCL_ADD_POINT4D
+
+        PCL_ADD_INTENSITY;
+        uint16_t ring;
+        double timestamp;
+
+        EIGEN_MAKE_ALIGNED_OPERATOR_NEW
+    } EIGEN_ALIGN16;
+}
+POINT_CLOUD_REGISTER_POINT_STRUCT (
+        robosenseM1_ros::Point,
+        (float, x, x)
+        (float, y, y)
+        (float, z, z)
+        (float, intensity, intensity)
+        (uint16_t, ring, ring)
+        (double, timestamp, timestamp)
+)
+
 class Preprocess
 {
   public:
@@ -141,7 +181,9 @@ class Preprocess
   ~Preprocess();
   
   void process(const livox_ros_driver2::msg::CustomMsg::UniquePtr &msg, PointCloudXYZI::Ptr &pcl_out);
-  void process(const sensor_msgs::msg::PointCloud2::UniquePtr &msg, PointCloudXYZI::Ptr &pcl_out);
+  // void process(const sensor_msgs::msg::PointCloud2::UniquePtr &msg, PointCloudXYZI::Ptr &pcl_out);
+   void process(const sensor_msgs::msg::PointCloud2::UniquePtr &msg, PointCloudXYZI::Ptr &pcl_out,
+               int i_sub_cloud, int num_sub_cloud, double & start_time, double & end_time);
   void set(bool feat_en, int lid_type, double bld, int pfilt_num);
 
   // sensor_msgs::PointCloud2::ConstPtr pointcloud;
@@ -159,6 +201,9 @@ private:
   void oust64_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &msg);
   void velodyne_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &msg);
   void mid360_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &msg);
+  void robosenseM1_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &msg, int i_sub_cloud, int num_sub_cloud, double & start_time, double & end_time);
+
+  void hesai_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &msg);
   void default_handler(const sensor_msgs::msg::PointCloud2::UniquePtr &msg);
   void give_feature(PointCloudXYZI &pl, vector<orgtype> &types);
   void pub_func(PointCloudXYZI &pl, const rclcpp::Time &ct);
