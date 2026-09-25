@@ -685,6 +685,9 @@ void publish_odometry(const rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPt
     }
 
     geometry_msgs::msg::TransformStamped trans;
+    // stamp が未設定 (0) だと、TF を時刻指定で引く側 (lidar_localization の map->odom 計算など) が
+    // 「latest data is at time 0」で毎回失敗する (2026-09-25 cygnus 実機で確認)。odom と同じ時刻を付ける
+    trans.header.stamp = odomAftMapped.header.stamp;
     trans.header.frame_id = "camera_init";
     trans.child_frame_id = "body";
     trans.transform.translation.x = odomAftMapped.pose.pose.position.x;
